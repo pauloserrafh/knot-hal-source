@@ -28,9 +28,13 @@ static const char *opt_host = NULL;
 static unsigned int opt_port = 9000;
 static const char *opt_spi = "/dev/spidev0.0";
 
-
+#define MESSAGE "hello nrfd"
+#define MESSAGE_SIZE  (sizeof(MESSAGE))
+char buffer[128];
+int stop;
 static void sig_term(int sig)
 {
+	stop = 1;
 	g_main_loop_quit(main_loop);
 }
 
@@ -115,18 +119,56 @@ static int tcp_init(void)
 	return sock;
 }
 
+
+// static void server_teste(void)
+// {
+//	nrf24l01_init();
+//	nrf24l01_set_channel(10);
+//	nrf24l01_set_standby();
+//	nrf24l01_open_pipe(0,0);
+//	printf("set TX!\n");
+//	nrf24l01_set_ptx(0);
+//	memcpy(buffer, MESSAGE,MESSAGE_SIZE);
+//	printf("msg: %s msg_size: %lu\n",buffer, MESSAGE_SIZE);
+//	while(!stop){
+//		nrf24l01_set_ptx(0);
+//		nrf24l01_ptx_data(&buffer, MESSAGE_SIZE, true);
+//		nrf24l01_ptx_wait_datasent();
+//		usleep(3000);
+//		memcpy(buffer, MESSAGE,MESSAGE_SIZE);
+//	}
+//}
+
+//static void cliente_teste(void)
+//{
+//	nrf24l01_init();
+//	nrf24l01_set_channel(10);
+//	nrf24l01_set_standby();
+//	nrf24l01_open_pipe(0,0);
+//	printf("set PRX\n");
+//	nrf24l01_set_prx();
+//	while(!stop){
+//		if(nrf24l01_prx_pipe_available() == 0){
+//			printf("avaible\n");
+//			nrf24l01_prx_data(&buffer,sizeof(buffer));
+//			printf("Recebi : %s\n",buffer);
+//		}
+//	}
+//}
+
 static int radio_init(void)
 {
 	GIOChannel *io;
 	GIOCondition cond = G_IO_IN | G_IO_ERR | G_IO_HUP;
-	int sock;
-	int ret;
+	int sock, ret;
+
 	if (opt_host == NULL) {
+
 		ret = spi_init(opt_spi);
 		if (ret < 0)
 			return ret;
-		nrf24l01_init();
-		return 0;
+
+		return nrf24l01_init();
 	} else {
 		/*
 		 * TCP development mode: Linux connected to RPi(nrfd radio
@@ -201,6 +243,8 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	//server_teste();
+	//cliente_teste();
 	g_main_loop_run(main_loop);
 
 	g_main_loop_unref(main_loop);
