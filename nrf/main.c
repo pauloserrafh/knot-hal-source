@@ -28,9 +28,13 @@ static const char *opt_host = NULL;
 static unsigned int opt_port = 9000;
 static const char *opt_spi = "/dev/spidev0.0";
 
-
+#define MESSAGE "hello nrfd"
+#define MESSAGE_SIZE  (sizeof(MESSAGE))
+char buffer[128];
+int stop;
 static void sig_term(int sig)
 {
+	stop = 1;
 	g_main_loop_quit(main_loop);
 }
 
@@ -119,14 +123,15 @@ static int radio_init(void)
 {
 	GIOChannel *io;
 	GIOCondition cond = G_IO_IN | G_IO_ERR | G_IO_HUP;
-	int sock;
-	int ret;
+	int sock, ret;
+
 	if (opt_host == NULL) {
+
 		ret = spi_init(opt_spi);
 		if (ret < 0)
 			return ret;
-		nrf24l01_init();
-		return 0;
+
+		return nrf24l01_init();
 	} else {
 		/*
 		 * TCP development mode: Linux connected to RPi(nrfd radio
@@ -201,6 +206,8 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	//server_teste();
+	//cliente_teste();
 	g_main_loop_run(main_loop);
 
 	g_main_loop_unref(main_loop);
