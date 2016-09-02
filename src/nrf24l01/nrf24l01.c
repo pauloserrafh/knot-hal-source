@@ -7,7 +7,6 @@
  *
  */
 
-#include <unistd.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -19,8 +18,6 @@
 // Pipes addresses base
 #define PIPE0_ADDR_BASE 0x55aa55aa5aLL
 #define PIPE1_ADDR_BASE 0xaa55aa55a5LL
-
-#define TSTBY2A			130			//130us
 
 
 typedef struct {
@@ -59,33 +56,6 @@ static uint8_t m_pipe0_addr = NRF24L01_PIPE0_ADDR;
 #define TPD2STBY	5000	//5ms
 #define TSTBY2A	130//130us
 
-#define CE 25
-
-#define DELAY_US(us)	usleep(us)
-
-#define BCM2709_RPI2	0x3F000000
-
-#ifdef RPI2_BOARD
-#define BCM2708_PERI_BASE	BCM2709_RPI2
-#elif RPI_BOARD
-#define BCM2708_PERI_BASE	BCM2708_RPI
-#else
-#error Board identifier required to BCM2708_PERI_BASE.
-#endif
-
-#define GPIO_BASE	(BCM2708_PERI_BASE + 0x200000)
-#define PAGE_SIZE	(4*1024)
-#define BLOCK_SIZE	(4*1024)
-
-#define INP_GPIO(g)	(*(gpio+((g)/10)) &= ~(7<<(((g)%10)*3)))
-#define OUT_GPIO(g)	(*(gpio+((g)/10)) |=  (1<<(((g)%10)*3)))
-
-//sets bits which are 1 ignores bits which are 0
-#define GPIO_SET	(*(gpio+7))
-//clears bits which are 1 ignores bits which are 0
-#define GPIO_CLR	(*(gpio+10))
-
-static volatile unsigned	*gpio;
 
 static inline int8_t inr(uint8_t reg)
 {
