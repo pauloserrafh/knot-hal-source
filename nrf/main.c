@@ -28,13 +28,8 @@ static const char *opt_host = NULL;
 static unsigned int opt_port = 9000;
 static const char *opt_spi = "/dev/spidev0.0";
 
-#define MESSAGE "hello nrfd"
-#define MESSAGE_SIZE  (sizeof(MESSAGE))
-char buffer[128];
-int stop;
 static void sig_term(int sig)
 {
-	stop = 1;
 	g_main_loop_quit(main_loop);
 }
 
@@ -206,8 +201,6 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	//server_teste();
-	//cliente_teste();
 	g_main_loop_run(main_loop);
 
 	g_main_loop_unref(main_loop);
