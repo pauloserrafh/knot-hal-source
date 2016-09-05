@@ -7,29 +7,33 @@
  *
  */
 
-#include <Arduino.h> 	// usar esse
-// #include <stdint.h> 	// ou esse
-#include "storage.h"
-// #include <avr/eeprom.h> // em breve
+#ifdef ARDUINO
 
-int16_t fsread(const char *key, char *buffer, uint16_t len)
+#include <avr/eeprom.h>
+#include <storage.h>
+
+int storage_write(uint8_t addr, uint8_t *value, uint16_t len)
 {
-	return 0;
+	int i;
+
+	for (i = 0; i < len; i++) {
+		eeprom_write_byte(addr, value[i]);
+		addr++;
+	}
+
+	return i;
 }
 
-int16_t fswrite(const char *key, char *buffer, uint16_t len)
+int storage_read(uint8_t addr, uint8_t *value, uint16_t len)
 {
-	return 0;
+	int i;
+
+	for (i = 0; i < len; i++) {
+		value[i] = eeprom_read_byte(addr);
+		addr++;
+	}
+
+	return i;
 }
 
-int fsteste(void)
-{
-	return 10;
-}
-
-static struct storage fsstorage = {
-	.read = fsread,
-	.write = fswrite,
-	// teste:&fsteste,
-	.teste = fsteste,
-};
+#endif

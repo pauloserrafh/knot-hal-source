@@ -10,14 +10,7 @@
 #ifndef __STORAGE_H__
 #define __STORAGE_H__
 
-int16_t fsread(const char *key, char *buffer, uint16_t len);
-int16_t fswrite(const char *key, char *buffer, uint16_t len);
-int fsteste(void);
-
-struct storage {
-	int16_t (*read)(const char *key, char *buffer, uint16_t len);
-	int16_t (*write) (const char *key, char *buffer, uint16_t len);
-	int (*teste)(void);
-};
+int storage_write(uint8_t addr, uint8_t *value, uint16_t len);
+int storage_read(uint8_t addr, uint8_t *value, uint16_t len);
 
 #endif /* __STORAGE_H__ */
