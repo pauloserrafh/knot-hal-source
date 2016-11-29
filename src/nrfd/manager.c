@@ -59,10 +59,10 @@ static int8_t get_peer(struct nrf24_mac mac) {
 	int8_t i;
 
 	for (i = 0; i < MAX_PEERS; i++)
-		if (peers[i].socket_fd != -1 && peers[i].mac.address.uint64 == mac.address.uint64) 
+		if (peers[i].socket_fd != -1 && peers[i].mac.address.uint64 == mac.address.uint64)
 			return i;
-		
-	
+
+
 	return -EINVAL;
 }
 
@@ -115,6 +115,7 @@ static gboolean knotd_io_watch(GIOChannel *io, GIOCondition cond,
 {
 
 	char buffer[128];
+	int err = -1;
 	ssize_t readbytes_knotd;
 	struct peer *p = (struct peer *)user_data;
 
@@ -129,11 +130,15 @@ static gboolean knotd_io_watch(GIOChannel *io, GIOCondition cond,
 		return FALSE;
 	}
 
-	printf("RX_KNOTD: %s\n",buffer);
+	printf("RX_KNOTD: %s %d\n",buffer, readbytes_knotd);
 	/* Send data to thing */
 	/* TODO: put data in list for transmission */
-	hal_comm_write(p->socket_fd, buffer, readbytes_knotd);
-	
+
+	while (err < 0) {
+		err = hal_comm_write(p->socket_fd, buffer, readbytes_knotd);
+
+	}
+	printf("enviou\n");
 
 	return TRUE;
 }
