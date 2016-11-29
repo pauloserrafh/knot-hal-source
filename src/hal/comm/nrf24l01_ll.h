@@ -84,7 +84,7 @@ struct nrf24_ll_data_pdu {
 /* 6 bits (64 packets) are reserved to sequence number*/
 #define NRF24_MAX_MSG_SIZE		(64 * NRF24_PW_MSG_SIZE)
 
-struct nrf24_ll_crtl_pdu {
+struct nrf14_ll_crtl_pdu {
 	uint8_t opcode;
 	uint8_t payload[0];
 } __attribute__ ((packed));
@@ -100,6 +100,10 @@ struct nrf24_ll_crtl_pdu {
 #define NRF24_LL_CRTL_OP_KEEPALIVE_REQ	0x01
 #define NRF24_LL_CRTL_OP_KEEPALIVE_RSP	0x02
 
+struct nrf14_ll_keepalive{
+	struct nrf24_mac src_addr;	/* Source address */
+	struct nrf24_mac dst_addr;	/* Destination address */
+} __attribute__ ((packed));
 
 
 /* Sent automatically from both sides after establishing connection */

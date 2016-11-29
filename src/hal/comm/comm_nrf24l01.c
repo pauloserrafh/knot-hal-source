@@ -37,7 +37,7 @@ static uint8_t connection_live = 0;
 
 /* TODO: Get this values from config file */
 static const struct nrf24_mac addr_gw = {
-					.address.uint64 = 0xDEADBEEF15678929};
+					.address.uint64 = 0xDEADBEEF12345678};
 
 static struct nrf24_mac addr_thing = {.address.uint64 = 0 };
 
@@ -64,6 +64,7 @@ struct nrf24_data {
 	size_t offset_rx;
 	unsigned long keepalive_wait;
 	uint8_t keepalive;
+	struct nrf24_mac mac;
 };
 
 #ifndef ARDUINO	/* If gateway then 5 peers */
@@ -142,11 +143,13 @@ static inline int alloc_pipe(void)
 	for (i = 0; i < CONNECTION_COUNTER; i++) {
 		if (peers[i].pipe == -1) {
 
-			peers[i].keepalive = 0;
 			peers[i].len_rx = 0;
 			peers[i].seqnumber_rx = 0;
 			peers[i].seqnumber_tx = 0;
 			peers[i].offset_rx = 0;
+			peers[i].keepalive_wait = 0;
+			peers[i].keepalive = 0;
+			peers[i].mac.address.uint64 = 0;
 			/* one peer for pipe*/
 			peers[i].pipe = i+1;
 			return peers[i].pipe;
@@ -157,24 +160,34 @@ static inline int alloc_pipe(void)
 	return -1;
 }
 
-static int write_keepalive(int spi_fd, int sockfd, int keepalive_op)
+
+static int write_keepalive(int spi_fd, int sockfd, int keepalive_op,
+							struct nrf24_mac dst, struct nrf24_mac src)
 {
 	int err;
 	/* Assemble keep alive package */
 	struct nrf24_io_pack p;
 	struct nrf24_ll_data_pdu *opdu =
 		(struct nrf24_ll_data_pdu *)p.payload;
-	struct nrf24_ll_crtl_pdu *ctrl =
-		(struct nrf24_ll_crtl_pdu *)opdu->payload;
+	struct nrf14_ll_crtl_pdu *ctrl =
+		(struct nrf14_ll_crtl_pdu *)opdu->payload;
+
+	struct nrf14_ll_keepalive *kpalive =
+		(struct nrf14_ll_keepalive *) ctrl->payload;
 
 	opdu->lid = NRF24_PDU_LID_CONTROL;
 	p.pipe = sockfd;
 	/* Keep alive opcode - Request or Response */
 	ctrl->opcode = keepalive_op;
 
+	kpalive->dst_addr.address.uint64 = dst.address.uint64;
+	kpalive->src_addr.address.uint64 = src.address.uint64;
 	/* Sends keep alive packet */
-	err = phy_write(spi_fd, &p, sizeof(struct nrf24_ll_data_pdu) +
-		sizeof(struct nrf24_ll_crtl_pdu));
+	printf("SEND KEEP ALIVE %d\n", keepalive_op);
+	err = phy_write(spi_fd, &p,
+					sizeof(struct nrf24_ll_data_pdu) +
+					sizeof(struct nrf14_ll_crtl_pdu) +
+					sizeof(struct nrf14_ll_keepalive));
 
 	if (err < 0)
 		return err;
@@ -187,21 +200,22 @@ static int check_keepalive(int spi_fd, int sockfd)
 
 	int err = 0;
 
-	/* If keepalive is disable */
-	if (peers[sockfd-1].keepalive == 0)
-		return err;
-
 	/* Check if timeout occurred */
 	if (hal_timeout(hal_time_ms(), peers[sockfd-1].keepalive_wait,
 		NRF24_KEEPALIVE_TIMEOUT_MS) > 0)
 		return -ETIMEDOUT;
+
+	/* If keepalive is disable */
+	if (peers[sockfd-1].keepalive == 0)
+		return err;
 
 	/* Sends keepalive request every NRF24_KEEPALIVE_SEND_MS */
 	if (hal_timeout(hal_time_ms(), peers[sockfd-1].keepalive_wait,
 		peers[sockfd-1].keepalive * NRF24_KEEPALIVE_SEND_MS) > 0) {
 		/* Sends keepalive packet */
 		err = write_keepalive(spi_fd, sockfd,
-				NRF24_LL_CRTL_OP_KEEPALIVE_REQ);
+				NRF24_LL_CRTL_OP_KEEPALIVE_REQ,
+				peers[sockfd-1].mac, addr_thing);
 
 		peers[sockfd-1].keepalive += 1;
 	}
@@ -269,7 +283,7 @@ static int read_mgmt(int spi_fd)
 		evt->opcode = MGMT_EVT_NRF24_BCAST_PRESENCE;
 		evt->index = 0;
 		/* Copy source address */
-		evt_presence->src.address.uint64 = mac->address.uint64;
+		evt_presence->mac.address.uint64 = mac->address.uint64;
 
 		mgmt.len_rx = sizeof(struct nrf24_mac) +
 				sizeof(struct mgmt_nrf24_header);
@@ -303,6 +317,7 @@ static int read_mgmt(int spi_fd)
 
 		mgmt.len_rx = sizeof(struct mgmt_nrf24_header) +
 				sizeof(struct mgmt_evt_nrf24_connected);
+
 	}
 		break;
 	default:
@@ -375,6 +390,11 @@ static int write_raw(int spi_fd, int sockfd)
 		peers[sockfd-1].seqnumber_tx++;
 	}
 
+	/* Restart keepalive timeout */
+	peers[sockfd-1].keepalive_wait = hal_time_ms();
+	if (peers[sockfd-1].keepalive >= 1)
+		peers[sockfd-1].keepalive = 1;
+
 	err = peers[sockfd-1].len_tx;
 
 	/* Resets controls */
@@ -403,14 +423,20 @@ static int read_raw(int spi_fd, int sockfd)
 		/* If is Control */
 		case NRF24_PDU_LID_CONTROL:
 		{
-			struct nrf24_ll_crtl_pdu *ctrl =
-				(struct nrf24_ll_crtl_pdu *)ipdu->payload;
+			struct nrf14_ll_crtl_pdu *ctrl =
+				(struct nrf14_ll_crtl_pdu *)ipdu->payload;
 
+			struct nrf14_ll_keepalive *kpalive =
+				(struct nrf14_ll_keepalive *) ctrl->payload;
 			/*
 			 * If is keep alive then resets keepalive_wait
 			 * Thing side
 			 */
-			if (ctrl->opcode == NRF24_LL_CRTL_OP_KEEPALIVE_RSP) {
+			if (ctrl->opcode == NRF24_LL_CRTL_OP_KEEPALIVE_RSP &&
+				kpalive->src_addr.address.uint64 ==
+				peers[sockfd-1].mac.address.uint64 &&
+				kpalive->dst_addr.address.uint64 ==
+				addr_thing.address.uint64) {
 				peers[sockfd-1].keepalive_wait = hal_time_ms();
 				peers[sockfd-1].keepalive = 1;
 			}
@@ -419,11 +445,17 @@ static int read_raw(int spi_fd, int sockfd)
 			 * If is keep alive then resets keepalive_wait
 			 * NRFD side
 			 */
-			if (ctrl->opcode == NRF24_LL_CRTL_OP_KEEPALIVE_REQ) {
+
+			if (ctrl->opcode == NRF24_LL_CRTL_OP_KEEPALIVE_REQ &&
+				kpalive->src_addr.address.uint64 ==
+				peers[sockfd-1].mac.address.uint64 &&
+				kpalive->dst_addr.address.uint64 ==
+				addr_gw.address.uint64) {
 				peers[sockfd-1].keepalive_wait = hal_time_ms();
-				peers[sockfd-1].keepalive = 1;
 				write_keepalive(spi_fd, sockfd,
-					NRF24_LL_CRTL_OP_KEEPALIVE_RSP);
+					NRF24_LL_CRTL_OP_KEEPALIVE_RSP,
+					peers[sockfd-1].mac,
+					addr_gw);
 			}
 
 		}
@@ -432,6 +464,11 @@ static int read_raw(int spi_fd, int sockfd)
 		/* If is Data */
 		case NRF24_PDU_LID_DATA_FRAG:
 		case NRF24_PDU_LID_DATA_END:
+			/* Restart keepalive timeout */
+			peers[sockfd-1].keepalive_wait = hal_time_ms();
+			if (peers[sockfd-1].keepalive >= 1)
+				peers[sockfd-1].keepalive = 1;
+
 			if (peers[sockfd-1].len_rx != 0)
 				break; /* Discard packet */
 
@@ -609,15 +646,13 @@ static void running(void)
 
 				evt->opcode = MGMT_EVT_NRF24_DISCONNECTED;
 
-				evt_discon->src.address.uint64 =
-					addr_thing.address.uint64;
-
-				evt_discon->dst.address.uint64 =
-					addr_gw.address.uint64;
-
+				evt_discon->mac.address.uint64 =
+					peers[sockIndex-1].mac.address.uint64;
 				mgmt.len_rx =
 					sizeof(struct mgmt_nrf24_header) +
 					sizeof(struct mgmt_evt_nrf24_disconnected);
+
+				peers[sockIndex-1].keepalive_wait = hal_time_ms();
 
 				/* TODO: Send disconnect packet to thing */
 			}
@@ -863,8 +898,13 @@ int hal_comm_accept(int sockfd, uint64_t *addr)
 	/* If accept then increment connection_live */
 	connection_live++;
 
+	/* Source address of gateway for keepalive message */
+	peers[pipe-1].mac.address.uint64 =
+		evt_connect->src.address.uint64;
+
 	/* Enable thing to send keep alive request */
-	peers[sockfd-1].keepalive = 1;
+	peers[pipe-1].keepalive = 1;
+	peers[pipe-1].keepalive_wait = hal_time_ms();
 
 	/* Return pipe */
 	return pipe;
@@ -900,11 +940,15 @@ int hal_comm_connect(int sockfd, uint64_t *addr)
 	memcpy(payload->aa, aa_pipes[sockfd],
 		sizeof(aa_pipes[sockfd]));
 
+	/* Source address of thing for keepalive message */
+	peers[sockfd-1].mac.address.uint64 = *addr;
+
 	len = sizeof(struct nrf24_ll_mgmt_connect);
 	len += sizeof(struct nrf24_ll_mgmt_pdu);
 
 	/* If connect then increment connection_live */
 	connection_live++;
+	peers[sockfd-1].keepalive_wait = hal_time_ms();
 	mgmt.len_tx = len;
 
 	return 0;

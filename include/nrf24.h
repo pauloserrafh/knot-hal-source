@@ -125,8 +125,7 @@ struct mgmt_evt_nrf24_connected {
 /* Sent after timeout or user initiated disconnection */
 #define MGMT_EVT_NRF24_DISCONNECTED		0x0202 /* PHY connected */
 struct mgmt_evt_nrf24_disconnected {
-	struct nrf24_mac src;	/* Source address */
-	struct nrf24_mac dst;	/* Destination address */
+	struct nrf24_mac mac;	/* Source address */
 } __attribute__ ((packed));
 
 #define MGMT_EVT_NRF24_BCAST_BEACON		0x0203 /* Non-connectable */
@@ -143,7 +142,7 @@ struct mgmt_evt_nrf24_bcast_setup {
 
 #define MGMT_EVT_NRF24_BCAST_PRESENCE		0x0205 /* Connectable */
 struct mgmt_evt_nrf24_bcast_presence {
-	struct nrf24_mac src;
+	struct nrf24_mac mac;
 	/* TODO: Add device/service infos? */
 } __attribute__ ((packed));
 
