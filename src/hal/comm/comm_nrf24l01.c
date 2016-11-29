@@ -37,7 +37,7 @@ static uint8_t connection_live = 0;
 
 /* TODO: Get this values from config file */
 static const struct nrf24_mac addr_gw = {
-					.address.uint64 = 0xDEADBEEF12345678};
+					.address.uint64 = 0xDEADBEEF15678929};
 
 static struct nrf24_mac addr_thing = {.address.uint64 = 0 };
 
@@ -117,8 +117,8 @@ static int driverIndex = -1;
 /* Channel to management and raw data */
 static int channel_mgmt = 20;
 static int channel_raw = 10;
-static uint16_t window_bcast = 1;	/* ms */
-static uint16_t interval_bcast = 2;	/* ms */
+static uint16_t window_bcast = 5;	/* ms */
+static uint16_t interval_bcast = 6;	/* ms */
 
 enum {
 	START_MGMT,
