@@ -32,6 +32,11 @@ PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.28, dummy=no,
 AC_SUBST(GLIB_CFLAGS)
 AC_SUBST(GLIB_LIBS)
 
+PKG_CHECK_MODULES(GIO_UNIX, gio-unix-2.0 >= 2.48, dummy=no,
+				AC_MSG_ERROR(required gio-unix >= 2.28))
+AC_SUBST(GIO_UNIX_CFLAGS)
+AC_SUBST(GIO_UNIX_LIBS)
+
 PKG_CHECK_MODULES(JSON, json-c,
   [AC_DEFINE([HAVE_JSON],[1],[Use JSON])],
   [AC_MSG_ERROR("json-c missing")])

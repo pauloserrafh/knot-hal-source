@@ -11,7 +11,7 @@ AM_CFLAGS = $(WARNING_CFLAGS) $(BUILD_CFLAGS)
 AM_LDFLAGS = $(BUILD_LDFLAGS)
 
 bin_PROGRAMS = proxy/spiproxyd src/nrfd/nrfd src/lorad/lorad tools/sniffer tools/rpiecho \
-						src/seriald/seriald
+					src/seriald/seriald src/nfcd/nfcd
 
 proxy_spiproxyd_SOURCES = proxy/main.c
 proxy_spiproxyd_LDADD = libs/libspi.a libs/libnrf24l01.a @GLIB_LIBS@
@@ -40,6 +40,12 @@ src_lorad_lorad_SOURCES = src/lorad/main.c
 src_lorad_lorad_LDADD = @GLIB_LIBS@
 src_lorad_lorad_LDFLAGS = $(AM_LDFLAGS)
 src_lorad_lorad_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@
+
+src_nfcd_nfcd_SOURCES = src/nfcd/main.c \
+				src/nfcd/log.h src/nfcd/log.c
+src_nfcd_nfcd_LDADD = @GLIB_LIBS@ @GIO_UNIX_LIBS@
+src_nfcd_nfcd_LDFLAGS = $(AM_LDFLAGS)
+src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@
 
 tools_sniffer_SOURCES = tools/sniffer.c
 tools_sniffer_LDADD = libs/libphy_driver.a \
