@@ -16,9 +16,13 @@
 
 #include "include/linux_log.h"
 
+#define NEARD_SERVER "org.neard"
+#define NEARD_INTERFACE "org.neard.Adapter"
+#define NEARD_OBJECT "/org/neard/nfc0"
 
 static GMainLoop *main_loop = NULL;
 static gboolean opt_detach = TRUE;
+static GDBusProxy *proxy_neard = NULL;
 
 static void sig_term(int sig)
 {
@@ -42,6 +46,7 @@ int main(int argc, char *argv[])
 	GOptionContext *context;
 	GError *gerr = NULL;
 	int err, retval = 0;
+	GDBusProxyFlags flags;
 
 	context = g_option_context_new(NULL);
 	g_option_context_add_main_entries(context, options, NULL);
@@ -60,10 +65,38 @@ int main(int argc, char *argv[])
 	signal(SIGINT, sig_term);
 	signal(SIGPIPE, SIG_IGN);
 
+	flags = G_DBUS_PROXY_FLAGS_NONE;
+
 	main_loop = g_main_loop_new(NULL, FALSE);
 
 	hal_log_init("nfcd", opt_detach);
 	hal_log_info("KnOT HAL NFCd\n");
+
+	if (opt_detach) {
+		if (daemon(0, 0)) {
+			hal_log_error("Can't start daemon!");
+			retval = EXIT_FAILURE;
+			goto done;
+		}
+	}
+
+	proxy_neard = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
+						flags,
+						NULL, /* GDBusInterfaceInfo */
+						NEARD_SERVER,
+						NEARD_OBJECT,
+						NEARD_INTERFACE,
+						NULL, /* GCancellable */
+						&gerr);
+	if (!proxy_neard) {
+		hal_log_error("Error creating proxy neard: %s\n",
+								gerr->message);
+		g_error_free(gerr);
+		goto done;
+	}
+
+	/* TODO: Monitor button press on GPIO */
+	/* TODO: Write keys to nfc tag and to keys database */
 
 	/* Set user id to nobody */
 	if (setuid(65534) != 0) {
@@ -74,24 +107,14 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	if (opt_detach) {
-		if (daemon(0, 0)) {
-			hal_log_error("Can't start daemon!");
-			retval = EXIT_FAILURE;
-			goto done;
-		}
-	}
-
-	/* TODO: Create proxies */
-	/* TODO: Monitor button press on GPIO */
-	/* TODO: Write keys to nfc tag and to keys database */
-
 	g_main_loop_run(main_loop);
 
 done:
 	hal_log_error("exiting ...");
 	hal_log_close();
 
+	if (proxy_neard)
+		g_object_unref(proxy_neard);
 	if (main_loop)
 		g_main_loop_unref(main_loop);
 
