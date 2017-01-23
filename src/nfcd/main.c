@@ -9,9 +9,11 @@
 
 #include <gio/gio.h>
 #include <gio/gunixfdlist.h>
-
 #include <stdio.h>
-
+#include <stdint.h>
+#include <string.h>
+#include "include/nrf24.h"
+#include "include/time.h"
 
 #define NRFD_SERVER "org.cesar.knot.nrf"
 #define NRFD_INTERFACE "org.cesar.knot.nrf.manager"
@@ -33,6 +35,7 @@ static GMainLoop *main_loop = NULL;
 static GDBusProxy *proxy_nrfd = NULL;
 static GDBusProxy *proxy_neard = NULL;
 static guint mgmtwatch;
+static uint32_t start_time;
 
 static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 		gchar *signal_name, GVariant *parameters, gpointer user_data)
@@ -47,7 +50,6 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 	char key[] = "SECURITYKEY";
 
 	error = NULL;
-
 	parameters_str = g_variant_print(parameters, TRUE);
 	g_print(" *** Received Signal: %s: %s\n", signal_name, parameters_str);
 
@@ -56,21 +58,26 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 	 * Neard has a method to power on/off the adapter, turn ir on/off when
 	 * the GPIO flag happens.
 	 */
-	/* TODO: Act according to the received signal */
-	connection = g_dbus_proxy_get_connection(proxy_to_call);
-	name_owner = g_dbus_proxy_get_name_owner(proxy_to_call);
+	if (!hal_timeout(hal_time_ms(), start_time, 10000)) {
+		/* TODO: Act according to the received signal */
+		connection = g_dbus_proxy_get_connection(proxy_to_call);
+		name_owner = g_dbus_proxy_get_name_owner(proxy_to_call);
 
-	reply = g_dbus_connection_call_sync(connection, name_owner,
-					NRFD_OBJECT, NRFD_INTERFACE,
-					"UpdateDevice", g_variant_new("(ss)",
-					key,mac), NULL,
-					G_DBUS_MESSAGE_FLAGS_NONE, -1, NULL,
-					&error);
+		reply = g_dbus_connection_call_sync(connection, name_owner,
+						NRFD_OBJECT, NRFD_INTERFACE,
+						"UpdateDevice",
+						g_variant_new("(ss)",
+						key,mac), NULL,
+						G_DBUS_MESSAGE_FLAGS_NONE, -1,
+						NULL, &error);
 
-	parameters_str = g_variant_print(reply, FALSE);
-	g_print(" *** Method Response %s\n", parameters_str);
+		parameters_str = g_variant_print(reply, FALSE);
+		g_print(" *** Method Response %s\n", parameters_str);
 
-	g_free(parameters_str);
+		g_free(parameters_str);
+	} else {
+		printf("TIMEDOUT PRESS BUTTON AGAIN\n");
+	}
 }
 
 static gboolean on_button_press(GIOChannel *io, GIOCondition cond,
@@ -82,13 +89,15 @@ static gboolean on_button_press(GIOChannel *io, GIOCondition cond,
 	char input;
 
 	/* TODO: Power adapter on via neard */
-	/* TODO: Start timeout and turn off adapter after it overflows*/
 
 	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR))
 		return FALSE;
 
 	/* Clear stdin */
 	scanf("%c", &input);
+
+	printf("BUTTON PRESS\n");
+	start_time = hal_time_ms();
 
 	/* FIXME: Dummy call for test only. Remove when using neard. */
 	connection = g_dbus_proxy_get_connection(proxy);
@@ -163,8 +172,6 @@ int main(int argc, char *argv[])
 	io = g_io_channel_unix_new(STDIN_FILENO);
 	mgmtwatch = g_io_add_watch(io, cond, on_button_press, proxy_neard);
 	g_io_channel_unref(io);
-
-	/* TODO: Write keys to nfc tag and to keys database */
 
 	printf("KnOT HAL NFCd\n");
 	g_main_loop_run(main_loop);

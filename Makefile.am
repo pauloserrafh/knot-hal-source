@@ -42,9 +42,21 @@ src_lorad_lorad_LDFLAGS = $(AM_LDFLAGS)
 src_lorad_lorad_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@
 
 src_nfcd_nfcd_SOURCES = src/nfcd/main.c
-src_nfcd_nfcd_LDADD = @GLIB_LIBS@ @GIO_UNIX_LIBS@
+src_nfcd_nfcd_LDADD = libs/libhallog.a \
+				libs/libhalcommnrf24.a \
+				libs/libphy_driver.a \
+				libs/libhaltime.a \
+				libs/libhalstorage.a \
+				libs/libnrf24l01.a \
+				libs/libspi.a \
+				@GLIB_LIBS@ @GIO_UNIX_LIBS@
 src_nfcd_nfcd_LDFLAGS = $(AM_LDFLAGS)
-src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@
+src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@ \
+				-I$(top_srcdir)/src \
+				-I$(top_srcdir)/src/nrf24l01 \
+				-I$(top_srcdir)/src/drivers \
+				-I$(top_srcdir)/src/hal/comm \
+				-I$(top_srcdir)/src/nrf24l01
 
 tools_sniffer_SOURCES = tools/sniffer.c
 tools_sniffer_LDADD = libs/libphy_driver.a \
