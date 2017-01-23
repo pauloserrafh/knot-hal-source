@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 #include "log.h"
+#include "include/nrf24.h"
 #include "include/time.h"
 
 #define NRFD_SERVER "org.cesar.knot.nrf"
@@ -25,7 +26,7 @@
 #define NEARD_SERVER "org.neard"
 #define NEARD_INTERFACE "org.neard.Adapter"
 #define NEARD_OBJECT "/org/gtk/GDBus/TestObject"
-
+#define MAC_SIZE_BYTES 24
 
 static GMainLoop *main_loop = NULL;
 static gboolean opt_detach = TRUE;
@@ -33,6 +34,16 @@ static GDBusProxy *proxy_nrfd = NULL;
 static GDBusProxy *proxy_neard = NULL;
 static guint mgmtwatch;
 static uint32_t start_time;
+static struct nrf24_mac addr;
+
+static void set_nrf24MAC(void)
+{
+	uint8_t mac_mask = 4;
+
+	memset(&addr, 0, sizeof(struct nrf24_mac));
+	hal_getrandom(addr.address.b + mac_mask,
+					sizeof(struct nrf24_mac) - mac_mask);
+}
 
 static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 		gchar *signal_name, GVariant *parameters, gpointer user_data)
@@ -43,8 +54,8 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 	gchar *name_owner;
 	GError *error;
 	GVariant *reply;
-	char mac[] = "MAC";
 	char key[] = "SECURITYKEY";
+	char mac_str[MAC_SIZE_BYTES];
 
 	error = NULL;
 	parameters_str = g_variant_print(parameters, TRUE);
@@ -57,7 +68,12 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 	 * the GPIO flag happens.
 	 */
 	if (!hal_timeout(hal_time_ms(), start_time, 10000)) {
-		/* TODO: Act according to the received signal */
+		/* TODO: Generate the keys using hal_sec() */
+		set_nrf24MAC();
+		memset(mac_str, 0, sizeof(mac_str));
+		nrf24_mac2str(&addr, mac_str);
+
+		/* TODO: Act according to the received signal from neard */
 		connection = g_dbus_proxy_get_connection(proxy_to_call);
 		name_owner = g_dbus_proxy_get_name_owner(proxy_to_call);
 
@@ -65,7 +81,7 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 						NRFD_OBJECT, NRFD_INTERFACE,
 						"UpdateDevice",
 						g_variant_new("(ss)",
-						key, mac), NULL,
+						key, mac_str), NULL,
 						G_DBUS_MESSAGE_FLAGS_NONE, -1,
 						NULL, &error);
 
@@ -75,6 +91,11 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 		g_variant_unref(reply);
 		g_free(name_owner);
 		g_free(parameters_str);
+		/*
+		 * TODO: Write keys to NFC Tag.
+		 * Write Thing's public and private keys and MAC
+		 * and GW public key.
+		 */
 	} else {
 		log_info("TIMEDOUT PRESS BUTTON AGAIN\n");
 	}
