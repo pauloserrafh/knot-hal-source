@@ -43,9 +43,11 @@ src_lorad_lorad_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@
 
 src_nfcd_nfcd_SOURCES = src/nfcd/main.c \
 				src/nfcd/log.h src/nfcd/log.c
-src_nfcd_nfcd_LDADD = @GLIB_LIBS@ @GIO_UNIX_LIBS@
+src_nfcd_nfcd_LDADD = libs/libhaltime.a \
+				@GLIB_LIBS@ @GIO_UNIX_LIBS@
 src_nfcd_nfcd_LDFLAGS = $(AM_LDFLAGS)
-src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@
+src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@ \
+				-I$(top_srcdir)/src
 
 tools_sniffer_SOURCES = tools/sniffer.c
 tools_sniffer_LDADD = libs/libphy_driver.a \
