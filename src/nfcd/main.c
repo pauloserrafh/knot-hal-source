@@ -31,7 +31,7 @@
 #define NEARD_INTERFACE "org.gtk.GDBus.TestInterface"
 #define NEARD_OBJECT "/org/gtk/GDBus/TestObject"
 #define MAC_SIZE_BYTES 24
-#define BUTTON 37
+#define BUTTON 21
 
 static GMainLoop *main_loop = NULL;
 static GDBusProxy *proxy_nrfd = NULL;
@@ -114,7 +114,6 @@ static gboolean on_button_press(gpointer user_data)
 			printf("BUTTON PRESS\n");
 			start_time = hal_time_ms();
 		}
-
 	} else {
 		pressed = FALSE;
 	}
