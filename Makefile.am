@@ -41,7 +41,7 @@ src_lorad_lorad_LDADD = @GLIB_LIBS@
 src_lorad_lorad_LDFLAGS = $(AM_LDFLAGS)
 src_lorad_lorad_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@
 
-src_nfcd_nfcd_SOURCES = src/nfcd/main.c
+src_nfcd_nfcd_SOURCES = src/nfcd/main.c src/nfcd/gpio.h src/nfcd/gpio.c
 src_nfcd_nfcd_LDADD = libs/libhallog.a \
 				libs/libhalcommnrf24.a \
 				libs/libphy_driver.a \
