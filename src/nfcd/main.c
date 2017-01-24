@@ -14,6 +14,7 @@
 #include <string.h>
 #include "include/nrf24.h"
 #include "include/time.h"
+#include "gpio.h"
 
 #define NRFD_SERVER "org.cesar.knot.nrf"
 #define NRFD_INTERFACE "org.cesar.knot.nrf.manager"
@@ -23,6 +24,7 @@
 #define NEARD_INTERFACE "org.neard.Adapter"
 #define NEARD_OBJECT "/org/gtk/GDBus/TestObject"
 #define MAC_SIZE_BYTES 24
+#define BUTTON 21
 
 static GMainLoop *main_loop = NULL;
 static GDBusProxy *proxy_nrfd = NULL;
@@ -30,6 +32,7 @@ static GDBusProxy *proxy_neard = NULL;
 static guint mgmtwatch;
 static uint32_t start_time;
 static struct nrf24_mac addr;
+static gboolean pressed = FALSE;
 
 static void set_nrf24MAC(void)
 {
@@ -96,35 +99,19 @@ static void on_signal(GDBusProxy *proxy, gchar *sender_name,
 	}
 }
 
-static gboolean on_button_press(GIOChannel *io, GIOCondition cond,
-							gpointer user_data)
+static gboolean on_button_press(gpointer user_data)
 {
-	GDBusProxy *proxy = user_data;
-	GDBusConnection *connection;
-	gchar *name_owner;
-	char input;
-
 	/* TODO: Power adapter on via neard */
-
-	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR))
-		return FALSE;
-
-	/* Clear stdin */
-	scanf("%c", &input);
-
-	printf("BUTTON PRESS\n");
-	start_time = hal_time_ms();
-
-	/* FIXME: Dummy call for test only. Remove when using neard. */
-	connection = g_dbus_proxy_get_connection(proxy);
-	name_owner = g_dbus_proxy_get_name_owner(proxy);
-	g_dbus_connection_call(connection, name_owner, NEARD_OBJECT,
-					NEARD_INTERFACE, "EmitSignal",
-					g_variant_new("(d)", 10.0), NULL,
-					G_DBUS_MESSAGE_FLAGS_NO_REPLY_EXPECTED,
-					-1, NULL, NULL, NULL);
-
-	g_free(name_owner);
+	/* TODO: Add debouncing */
+	if (gpio_digital_read(BUTTON)) {
+		if (!pressed) {
+			pressed = TRUE;
+			printf("BUTTON PRESS\n");
+			start_time = hal_time_ms();
+		}
+	} else {
+		pressed = FALSE;
+	}
 
 	return TRUE;
 }
@@ -138,8 +125,6 @@ int main(int argc, char *argv[])
 {
 	GError *error;
 	GDBusProxyFlags flags;
-	GIOChannel *io = NULL;
-	GIOCondition cond = G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL;
 
 	signal(SIGTERM, sig_term);
 	signal(SIGINT, sig_term);
@@ -183,13 +168,12 @@ int main(int argc, char *argv[])
 	g_signal_connect(proxy_neard, "g-signal",
 			G_CALLBACK(on_signal), proxy_nrfd);
 
-	/*
-	 * FIXME: on_button_press should be called when the external button is
-	 * pressed
-	 */
-	io = g_io_channel_unix_new(STDIN_FILENO);
-	mgmtwatch = g_io_add_watch(io, cond, on_button_press, proxy_neard);
-	g_io_channel_unref(io);
+	if (gpio_setup()) {
+		printf("IO SETUP ERROR\n");
+		goto out;
+	}
+	gpio_pin_mode(BUTTON, OUTPUT);
+	mgmtwatch = g_idle_add(on_button_press, NULL);
 
 	printf("KnOT HAL NFCd\n");
 	g_main_loop_run(main_loop);
