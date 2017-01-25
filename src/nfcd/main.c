@@ -14,7 +14,7 @@
 #include <string.h>
 #include "include/nrf24.h"
 #include "include/time.h"
-#include "gpio.h"
+#include "include/gpio.h"
 
 #define NRFD_SERVER "org.cesar.knot.nrf"
 #define NRFD_INTERFACE "org.cesar.knot.nrf.manager"
@@ -103,7 +103,7 @@ static gboolean on_button_press(gpointer user_data)
 {
 	/* TODO: Power adapter on via neard */
 	/* TODO: Add debouncing */
-	if (gpio_digital_read(BUTTON)) {
+	if (hal_gpio_digital_read(BUTTON)) {
 		if (!pressed) {
 			pressed = TRUE;
 			printf("BUTTON PRESS\n");
@@ -168,11 +168,11 @@ int main(int argc, char *argv[])
 	g_signal_connect(proxy_neard, "g-signal",
 			G_CALLBACK(on_signal), proxy_nrfd);
 
-	if (gpio_setup()) {
+	if (hal_gpio_setup()) {
 		printf("IO SETUP ERROR\n");
 		goto out;
 	}
-	gpio_pin_mode(BUTTON, OUTPUT);
+	hal_gpio_pin_mode(BUTTON, OUTPUT);
 	mgmtwatch = g_idle_add(on_button_press, NULL);
 
 	printf("KnOT HAL NFCd\n");
