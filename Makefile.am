@@ -5,7 +5,7 @@ ZIP=zip
 
 AM_MAKEFLAGS = --no-print-directory
 SUBDIRS = src/spi src/nrf24l01 src/hal/storage src/hal/time \
-					src/hal/comm src/drivers
+					src/hal/comm src/drivers src/hal/gpio
 
 AM_CFLAGS = $(WARNING_CFLAGS) $(BUILD_CFLAGS)
 AM_LDFLAGS = $(BUILD_LDFLAGS)
@@ -42,20 +42,21 @@ src_lorad_lorad_LDFLAGS = $(AM_LDFLAGS)
 src_lorad_lorad_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@
 
 src_nfcd_nfcd_SOURCES = src/nfcd/main.c \
-				src/nfcd/log.h src/nfcd/log.c \
-				src/nfcd/gpio.h src/nfcd/gpio.c
+				src/nfcd/log.h src/nfcd/log.c
 src_nfcd_nfcd_LDADD = libs/libhaltime.a \
 				libs/libhalcommnrf24.a \
 				libs/libphy_driver.a \
 				libs/libnrf24l01.a \
 				libs/libspi.a \
+				libs/libhalgpio.a \
 				@GLIB_LIBS@ @GIO_UNIX_LIBS@
 src_nfcd_nfcd_LDFLAGS = $(AM_LDFLAGS)
 src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@ \
 				-I$(top_srcdir)/src \
 				-I$(top_srcdir)/src/nrf24l01 \
 				-I$(top_srcdir)/src/drivers \
-				-I$(top_srcdir)/src/hal/comm
+				-I$(top_srcdir)/src/hal/comm \
+				-I$(top_srcdir)/src/hal/gpio
 
 
 tools_sniffer_SOURCES = tools/sniffer.c

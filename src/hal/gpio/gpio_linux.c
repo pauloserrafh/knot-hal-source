@@ -6,11 +6,11 @@
  * of the BSD license. See the LICENSE file for details.
  *
  */
-#include "gpio.h"
+#include "include/gpio.h"
 
 static volatile unsigned	*gpio;
 
-int gpio_setup(void)
+int hal_gpio_setup(void)
 {
 	int mem_fd;
 
@@ -30,7 +30,7 @@ int gpio_setup(void)
 	return 0;
 }
 
-void gpio_pin_mode(uint8_t pin, uint8_t mode)
+void hal_gpio_pin_mode(uint8_t pin, uint8_t mode)
 {
 	if (mode == OUTPUT) {
 		/* MUST use INP_GPIO before OUT_GPIO */
@@ -41,9 +41,29 @@ void gpio_pin_mode(uint8_t pin, uint8_t mode)
 	}
 }
 
-int gpio_digital_read(uint8_t pin)
+void hal_gpio_digital_write(uint8_t pin, uint8_t value)
+{
+
+}
+
+int hal_gpio_digital_read(uint8_t pin)
 {
 	if (GET_GPIO(pin))
 		return 1;
 	return 0;
+}
+
+int hal_gpio_analog_read(uint8_t pin)
+{
+	return 0;
+}
+
+void hal_gpio_analog_reference(uint8_t type)
+{
+
+}
+
+void hal_gpio_analog_write(uint8_t pin, int value)
+{
+
 }
