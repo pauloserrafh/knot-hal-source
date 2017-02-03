@@ -40,6 +40,14 @@ static struct nrf24_mac addr_master = {.address.uint64 = 0};
 
 static struct nrf24_mac addr_slave = {.address.uint64 = 0 };
 
+static char *slave_name;
+
+/* Structure with the data sent in a presence */
+struct nrf24_presence {
+	struct nrf24_mac addr;
+	char *name;
+};
+
 /* Structure to save broadcast context */
 struct nrf24_mgmt {
 	int8_t pipe;
@@ -573,8 +581,9 @@ static void presence_connect(int spi_fd)
 {
 	struct nrf24_io_pack p;
 	struct nrf24_ll_mgmt_pdu *opdu = (void *)p.payload;
-	struct nrf24_mac *payload =
-				(struct nrf24_mac *) opdu->payload;
+	struct nrf24_presence payload;
+	// struct nrf24_mac *payload =
+	// 			(struct nrf24_mac *) opdu->payload;
 	size_t len;
 	static unsigned long start;
 	/* Start timeout */
@@ -585,11 +594,12 @@ static void presence_connect(int spi_fd)
 		/* Send Presence */
 		if (addr_slave.address.uint64 == 0)
 			break;
-
 		p.pipe = 0;
 		opdu->type = NRF24_PDU_TYPE_PRESENCE;
-		payload->address.uint64 = addr_slave.address.uint64;
-		len = sizeof(struct nrf24_ll_mgmt_pdu)+sizeof(struct nrf24_mac);
+		payload.addr.address.uint64 = (struct nrf24_mac *)opdu->payload;
+		payload.name = slave_name;
+		len = sizeof(struct nrf24_ll_mgmt_pdu)+
+						sizeof(struct nrf24_presence);
 		phy_write(spi_fd, &p, len);
 		/* Init time */
 		start = hal_time_ms();
@@ -914,8 +924,9 @@ int hal_comm_listen(int sockfd)
 	return 0;
 }
 
-int hal_comm_accept(int sockfd, uint64_t *addr)
+int hal_comm_accept(int sockfd, uint64_t *addr, char *name)
 {
+	int len;
 
 	/* TODO: Run background procedures */
 	struct mgmt_nrf24_header *evt =
@@ -929,6 +940,11 @@ int hal_comm_accept(int sockfd, uint64_t *addr)
 
 	/* Save slave address */
 	addr_slave.address.uint64 = *addr;
+
+	/* Save slave name */
+	len = strlen(name)+1;
+	slave_name = (char *)calloc(1, len);
+	strncpy(slave_name, name, len);
 
 	if (mgmt.len_rx == 0)
 		return -EAGAIN;
