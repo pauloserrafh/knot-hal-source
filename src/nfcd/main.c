@@ -15,14 +15,19 @@
 #include <string.h>
 
 #include "include/linux_log.h"
+#include "include/gpio.h"
 
 #define NEARD_SERVER "org.neard"
 #define NEARD_INTERFACE "org.neard.Adapter"
 #define NEARD_OBJECT "/org/neard/nfc0"
 
+#define BUTTON 23
+
 static GMainLoop *main_loop = NULL;
 static gboolean opt_detach = TRUE;
 static GDBusProxy *proxy_neard = NULL;
+static gboolean pressed = FALSE;
+static guint mgmtwatch;
 
 static void sig_term(int sig)
 {
@@ -40,6 +45,23 @@ static GOptionEntry options[] = {
 					"Logging in foreground" },
 	{ NULL },
 };
+
+static gboolean on_button_press(gpointer user_data)
+{
+	/* The buttons have an external pull-up */
+	/* TODO: Add debouncing */
+	if (!hal_gpio_digital_read(BUTTON)) {
+		if (!pressed) {
+			pressed = TRUE;
+			hal_log_info("BUTTON PRESS\n");
+			/* TODO: Power tag on and poll using neard */
+		}
+	} else {
+		pressed = FALSE;
+	}
+
+	return TRUE;
+}
 
 int main(int argc, char *argv[])
 {
@@ -95,7 +117,13 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
-	/* TODO: Monitor button press on GPIO */
+	if (hal_gpio_setup()) {
+		hal_log_error("IO SETUP ERROR\n");
+		goto done;
+	}
+	hal_gpio_pin_mode(BUTTON, INPUT);
+	mgmtwatch = g_idle_add(on_button_press, NULL);
+
 	/* TODO: Write keys to nfc tag and to keys database */
 
 	/* Set user id to nobody */
@@ -113,6 +141,8 @@ done:
 	hal_log_error("exiting ...");
 	hal_log_close();
 
+	if (mgmtwatch)
+		g_source_remove(mgmtwatch);
 	if (proxy_neard)
 		g_object_unref(proxy_neard);
 	if (main_loop)
