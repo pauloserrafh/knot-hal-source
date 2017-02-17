@@ -27,6 +27,7 @@ proxy/spiproxyd
 src/nrfd/nrfd
 src/seriald/seriald
 src/lorad/lorad
+src/nfcd/nfcd
 tools/rpiecho
 tools/sniffer
 
