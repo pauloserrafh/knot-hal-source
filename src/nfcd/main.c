@@ -22,6 +22,7 @@
 #define NEARD_OBJECT "/org/neard/nfc0"
 
 #define BUTTON 23
+#define LED 27
 
 static GMainLoop *main_loop = NULL;
 static gboolean opt_detach = TRUE;
@@ -46,20 +47,113 @@ static GOptionEntry options[] = {
 	{ NULL },
 };
 
+static int start_adapter(void)
+{
+	GError *gerr = NULL;
+	int retval = 0;
+	GVariant *response, *tmp;
+	gboolean powered, polling;
+
+	/* Check if adapter already powered on */
+	response = g_dbus_proxy_call_sync(proxy_neard,
+					"org.freedesktop.DBus.Properties.Get",
+					g_variant_new("(ss)", NEARD_INTERFACE,
+					"Powered"),
+					G_DBUS_MESSAGE_FLAGS_NONE,
+					-1, NULL, &gerr);
+
+	if (gerr) {
+		hal_log_error("Error %s\n", gerr->message);
+		g_error_free(gerr);
+		goto done;
+	}
+
+	g_variant_get_child(response, 0, "v", &tmp);
+	powered = g_variant_get_boolean(tmp);
+
+	g_variant_unref(response);
+	g_variant_unref(tmp);
+
+	if (!powered) {
+		/* Power on adapter */
+		response = g_dbus_proxy_call_sync(proxy_neard,
+					"org.freedesktop.DBus.Properties.Set",
+					g_variant_new("(ssv)", NEARD_INTERFACE,
+					"Powered", g_variant_new_boolean(TRUE)),
+					G_DBUS_MESSAGE_FLAGS_NO_REPLY_EXPECTED,
+					-1, NULL, &gerr);
+		if (gerr) {
+			hal_log_error("Error %s\n", gerr->message);
+			retval = EXIT_FAILURE;
+			g_error_free(gerr);
+			goto done;
+		}
+		g_variant_unref(response);
+		hal_log_info("Powered on\n");
+	}
+
+	/* Check if already polling */
+	response = g_dbus_proxy_call_sync(proxy_neard,
+					"org.freedesktop.DBus.Properties.Get",
+					g_variant_new("(ss)", NEARD_INTERFACE,
+					"Polling"),
+					G_DBUS_MESSAGE_FLAGS_NO_REPLY_EXPECTED,
+					-1, NULL, &gerr);
+
+	if (gerr) {
+		hal_log_error("Error %s\n", gerr->message);
+		g_error_free(gerr);
+		goto done;
+	}
+
+	g_variant_get_child(response, 0, "v", &tmp);
+	polling = g_variant_get_boolean(tmp);
+
+	g_variant_unref(response);
+	g_variant_unref(tmp);
+
+	if (!polling) {
+		/* Start polling */
+		response = g_dbus_proxy_call_sync(proxy_neard, "StartPollLoop",
+					g_variant_new("(s)", "Initiator"),
+					G_DBUS_MESSAGE_FLAGS_NONE,
+					-1, NULL, &gerr);
+		if (gerr) {
+			hal_log_error("Error %s\n", gerr->message);
+			retval = EXIT_FAILURE;
+			g_error_free(gerr);
+			goto done;
+		}
+		g_variant_unref(response);
+		hal_log_info("Polling\n");
+	}
+
+	hal_gpio_digital_write(LED, HIGH);
+done:
+	return retval;
+}
+
 static gboolean on_button_press(gpointer user_data)
 {
+	int err;
+
 	/* The buttons have an external pull-up */
 	/* TODO: Add debouncing */
 	if (!hal_gpio_digital_read(BUTTON)) {
 		if (!pressed) {
 			pressed = TRUE;
-			hal_log_info("BUTTON PRESS\n");
-			/* TODO: Power tag on and poll using neard */
+			err = start_adapter();
+			if (err)
+				goto done;
+			/* Attach function to TagFound signal */
+			/* Copy MAC and keys to tag and send to nrfd */
+			/* Power off adapter after timeout */
 		}
 	} else {
 		pressed = FALSE;
 	}
 
+done:
 	return TRUE;
 }
 
@@ -121,6 +215,7 @@ int main(int argc, char *argv[])
 		hal_log_error("IO SETUP ERROR\n");
 		goto done;
 	}
+	hal_gpio_pin_mode(LED, OUTPUT);
 	hal_gpio_pin_mode(BUTTON, INPUT);
 	mgmtwatch = g_idle_add(on_button_press, NULL);
 
