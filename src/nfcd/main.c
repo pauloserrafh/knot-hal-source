@@ -23,6 +23,7 @@
 
 #define BUTTON 23
 #define LED 27
+#define TIMEOUT 10
 
 static GMainLoop *main_loop = NULL;
 static gboolean opt_detach = TRUE;
@@ -220,6 +221,12 @@ done:
 	return retval;
 }
 
+static gboolean timed_out(gpointer user_data)
+{
+	stop_adapter();
+	return FALSE;
+}
+
 static gboolean on_button_press(gpointer user_data)
 {
 	int err;
@@ -233,8 +240,10 @@ static gboolean on_button_press(gpointer user_data)
 			if (err)
 				goto done;
 			/* Attach function to TagFound signal */
+			/* TODO: Turn LED on to inform nfc is polling */
+			g_timeout_add_seconds(TIMEOUT, timed_out, NULL);
+
 			/* Copy MAC and keys to tag and send to nrfd */
-			/* Power off adapter after timeout */
 		}
 	} else {
 		pressed = FALSE;
