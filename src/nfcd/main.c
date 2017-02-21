@@ -28,8 +28,10 @@
 static GMainLoop *main_loop = NULL;
 static gboolean opt_detach = TRUE;
 static GDBusProxy *proxy_neard = NULL;
+static GDBusObjectManager *manager = NULL;
 static gboolean pressed = FALSE;
 static guint mgmtwatch;
+static gboolean tag_present = FALSE;
 
 static void sig_term(int sig)
 {
@@ -47,6 +49,71 @@ static GOptionEntry options[] = {
 					"Logging in foreground" },
 	{ NULL },
 };
+
+static void on_object_removed(GDBusObjectManager *manager, GDBusObject *object,
+							gpointer user_data)
+{
+	gchar *owner;
+
+	owner = g_dbus_object_manager_client_get_name_owner(
+		G_DBUS_OBJECT_MANAGER_CLIENT (manager));
+		g_print ("Removed object at %s (owner %s)\n",
+			g_dbus_object_get_object_path(object), owner);
+
+	tag_present = FALSE;
+	/*
+	 * TODO: Verify if the tag was successfully recorded with the info
+	 * or if it is necessary to restart polling and record again.
+	 */
+
+	g_free (owner);
+}
+
+static void on_object_added(GDBusObjectManager *manager, GDBusObject *object,
+							gpointer user_data)
+{
+	gchar *owner;
+
+	/*
+	 * TODO: Verify if the object added is really a tag or something else
+	 * e.g., an adapter.
+	  */
+
+	owner = g_dbus_object_manager_client_get_name_owner(
+					G_DBUS_OBJECT_MANAGER_CLIENT(manager));
+	hal_log_info("Added object at %s (owner %s)\n",
+				g_dbus_object_get_object_path(object), owner);
+
+	tag_present = TRUE;
+
+	g_free(owner);
+}
+
+static long int attach_signal(void)
+{
+	int retval = 0;
+	gulong signal_handler;
+
+	signal_handler = g_signal_connect(manager, "object-added",
+						G_CALLBACK(on_object_added),
+						NULL);
+	if (!signal_handler) {
+		hal_log_error("Can't create handler for signal\n");
+		retval = EXIT_FAILURE;
+		goto done;
+	}
+
+	signal_handler = g_signal_connect(manager, "object-removed",
+						G_CALLBACK(on_object_removed),
+						NULL);
+	if (!signal_handler) {
+		hal_log_error("Can't create handler for signal\n");
+		retval = EXIT_FAILURE;
+	}
+
+done:
+	return retval;
+}
 
 static int start_adapter(void)
 {
@@ -223,6 +290,10 @@ done:
 
 static gboolean timed_out(gpointer user_data)
 {
+	/* If the tag is still present, do not turn off the adapter */
+	if(tag_present)
+		return TRUE;
+
 	stop_adapter();
 	return FALSE;
 }
@@ -239,7 +310,6 @@ static gboolean on_button_press(gpointer user_data)
 			err = start_adapter();
 			if (err)
 				goto done;
-			/* Attach function to TagFound signal */
 			/* TODO: Turn LED on to inform nfc is polling */
 			g_timeout_add_seconds(TIMEOUT, timed_out, NULL);
 
@@ -307,6 +377,17 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
+	manager = g_dbus_object_manager_client_new_for_bus_sync(
+					G_BUS_TYPE_SYSTEM,
+					G_DBUS_OBJECT_MANAGER_CLIENT_FLAGS_NONE,
+					"org.neard", "/", NULL, NULL, NULL,
+					NULL, &gerr);
+	if (gerr) {
+		hal_log_error("Error %s\n", gerr->message);
+		g_error_free(gerr);
+		goto done;
+	}
+
 	if (hal_gpio_setup()) {
 		hal_log_error("IO SETUP ERROR\n");
 		goto done;
@@ -314,6 +395,11 @@ int main(int argc, char *argv[])
 	hal_gpio_pin_mode(LED, OUTPUT);
 	hal_gpio_pin_mode(BUTTON, INPUT);
 	mgmtwatch = g_idle_add(on_button_press, NULL);
+
+	/* Attach function to TagFound signal */
+	err = attach_signal();
+	if (err)
+		goto done;
 
 	/* TODO: Write keys to nfc tag and to keys database */
 
@@ -333,6 +419,8 @@ done:
 	hal_log_error("exiting ...");
 	hal_log_close();
 
+	if (manager)
+		g_object_unref(manager);
 	if (mgmtwatch)
 		g_source_remove(mgmtwatch);
 	if (proxy_neard)
