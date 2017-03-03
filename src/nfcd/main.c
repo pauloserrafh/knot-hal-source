@@ -33,11 +33,6 @@ static gboolean pressed = FALSE;
 static guint mgmtwatch;
 static gboolean tag_present = FALSE;
 
-static void sig_term(int sig)
-{
-	g_main_loop_quit(main_loop);
-}
-
 /*
  * OPTIONAL: describe the valid values ranges
  * for tx and channel
@@ -49,6 +44,11 @@ static GOptionEntry options[] = {
 					"Logging in foreground" },
 	{ NULL },
 };
+
+static void sig_term(int sig)
+{
+	g_main_loop_quit(main_loop);
+}
 
 static void on_object_removed(GDBusObjectManager *manager, GDBusObject *object,
 							gpointer user_data)
@@ -77,7 +77,9 @@ static void on_object_added(GDBusObjectManager *manager, GDBusObject *object,
 	/*
 	 * TODO: Verify if the object added is really a tag or something else
 	 * e.g., an adapter.
-	  */
+	 */
+
+	/* TODO: Copy MAC and keys to tag and send to nrfd */
 
 	owner = g_dbus_object_manager_client_get_name_owner(
 					G_DBUS_OBJECT_MANAGER_CLIENT(manager));
@@ -310,10 +312,8 @@ static gboolean on_button_press(gpointer user_data)
 			err = start_adapter();
 			if (err)
 				goto done;
-			/* TODO: Turn LED on to inform nfc is polling */
-			g_timeout_add_seconds(TIMEOUT, timed_out, NULL);
 
-			/* Copy MAC and keys to tag and send to nrfd */
+			g_timeout_add_seconds(TIMEOUT, timed_out, NULL);
 		}
 	} else {
 		pressed = FALSE;
@@ -396,12 +396,10 @@ int main(int argc, char *argv[])
 	hal_gpio_pin_mode(BUTTON, INPUT);
 	mgmtwatch = g_idle_add(on_button_press, NULL);
 
-	/* Attach function to TagFound signal */
+	/* Attach functions to signals for Interfaces Added and Removed */
 	err = attach_signal();
 	if (err)
 		goto done;
-
-	/* TODO: Write keys to nfc tag and to keys database */
 
 	/* Set user id to nobody */
 	if (setuid(65534) != 0) {
