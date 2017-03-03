@@ -16,6 +16,7 @@
 
 #include "include/linux_log.h"
 #include "include/gpio.h"
+#include "include/time.h"
 
 #define NEARD_SERVER "org.neard"
 #define NEARD_INTERFACE "org.neard.Adapter"
@@ -320,6 +321,8 @@ static gboolean on_button_press(gpointer user_data)
 	}
 
 done:
+	/* Sleep to allow system to handle signals */
+	hal_delay_us(100);
 	return TRUE;
 }
 

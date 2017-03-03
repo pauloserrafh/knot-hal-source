@@ -44,6 +44,7 @@ src_lorad_lorad_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@
 
 src_nfcd_nfcd_SOURCES = src/nfcd/main.c
 src_nfcd_nfcd_LDADD = libs/libhallog.a libs/libhalgpio.a \
+				libs/libhaltime.a \
 				@GLIB_LIBS@ @GIO_UNIX_LIBS@
 src_nfcd_nfcd_LDFLAGS = $(AM_LDFLAGS)
 src_nfcd_nfcd_CFLAGS = $(AM_CFLAGS) @GLIB_CFLAGS@ @GIO_UNIX_CFLAGS@
