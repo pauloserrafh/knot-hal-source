@@ -14,6 +14,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <stdio.h>
+
 #include "include/linux_log.h"
 #include "include/gpio.h"
 #include "include/time.h"
@@ -21,6 +23,7 @@
 #define NEARD_SERVER "org.neard"
 #define NEARD_INTERFACE "org.neard.Adapter"
 #define NEARD_OBJECT "/org/neard/nfc0"
+#define TAG_INTERFACE "org.neard.Tag"
 
 #define BUTTON 23
 #define LED 27
@@ -74,20 +77,105 @@ static void on_object_added(GDBusObjectManager *manager, GDBusObject *object,
 							gpointer user_data)
 {
 	gchar *owner;
+	const gchar *object_path;
+	GVariant *response;
+	GVariantBuilder builder;
+	GVariant *dict;
+	GError *gerr = NULL;
+	GDBusProxy *proxy_tag = NULL;
 
 	/*
 	 * TODO: Verify if the object added is really a tag or something else
 	 * e.g., an adapter.
 	 */
-
 	/* TODO: Copy MAC and keys to tag and send to nrfd */
 
 	owner = g_dbus_object_manager_client_get_name_owner(
 					G_DBUS_OBJECT_MANAGER_CLIENT(manager));
-	hal_log_info("Added object at %s (owner %s)\n",
-				g_dbus_object_get_object_path(object), owner);
+
+	object_path = g_dbus_object_get_object_path(object);
+
+	hal_log_info("Added object at %s (owner %s)\n", object_path, owner);
+
+	if(!strstr(object_path,"/tag"))
+		goto done;
+
+	if(strstr(object_path,"/record"))
+		goto done;
+
+
+	proxy_tag = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
+						G_DBUS_PROXY_FLAGS_NONE,
+						NULL, /* GDBusInterfaceInfo */
+						NEARD_SERVER,
+						object_path,
+						TAG_INTERFACE,
+						NULL, /* GCancellable */
+						&gerr);
+	if (!proxy_tag) {
+		hal_log_error("Error creating proxy to tag: %s\n",
+								gerr->message);
+		g_error_free(gerr);
+		goto done;
+	}
 
 	tag_present = TRUE;
+
+	g_variant_builder_init(&builder, G_VARIANT_TYPE ("a{sv}"));
+
+	g_variant_builder_add(&builder, "{sv}", "Type",
+					g_variant_new("s", "Text"));
+
+	g_variant_builder_add(&builder, "{sv}", "Encoding",
+					g_variant_new("s", "UTF-8"));
+
+	g_variant_builder_add(&builder, "{sv}", "Language",
+					g_variant_new("s", "en"));
+
+	g_variant_builder_add(&builder, "{sv}", "Representation",
+					g_variant_new("s", "Hello,World"));
+
+	dict = g_variant_builder_end(&builder);
+
+
+	// builder = g_variant_builder_new(G_VARIANT_TYPE("a{sv}"));
+
+	// g_variant_builder_add(builder, "{sv}", "Type",
+	// 				g_variant_new("(s)", "Text"));
+
+	// g_variant_builder_add(builder, "{sv}", "Encoding",
+	// 				g_variant_new("(s)", "UTF-8"));
+
+	// g_variant_builder_add(builder, "{sv}", "Language",
+	// 				g_variant_new("(s)", "en-US"));
+
+	// g_variant_builder_add(builder, "{sv}", "Representation",
+	// 				g_variant_new("(s)", "Hello,World"));
+
+	// dict = g_variant_builder_end(builder);
+
+	// //dict = g_variant_new("a{sv}", builder);
+
+	// g_variant_builder_unref(builder);
+
+	response = g_dbus_proxy_call_sync(proxy_tag,
+					"Write", g_variant_new_tuple(&dict, 1),
+					G_DBUS_MESSAGE_FLAGS_NO_REPLY_EXPECTED,
+					-1, NULL, &gerr);
+
+	if (gerr) {
+		hal_log_error("Error2 %s\n", gerr->message);
+		g_error_free(gerr);
+		if(response)
+			g_variant_unref(response);
+		goto done;
+	}
+
+	g_object_unref(proxy_tag);
+	g_variant_unref(response);
+	hal_log_info("Wrote TAG!");
+
+done:
 
 	g_free(owner);
 }
@@ -199,7 +287,7 @@ static int start_adapter(void)
 		hal_log_info("Polling\n");
 	}
 
-	hal_gpio_digital_write(LED, HIGH);
+	//hal_gpio_digital_write(LED, HIGH);
 done:
 	return retval;
 }
@@ -285,7 +373,7 @@ static int stop_adapter(void)
 		g_variant_unref(response);
 		hal_log_info("Powered off\n");
 	}
-	hal_gpio_digital_write(LED, LOW);
+	//hal_gpio_digital_write(LED, LOW);
 
 done:
 	return retval;
@@ -301,13 +389,21 @@ static gboolean timed_out(gpointer user_data)
 	return FALSE;
 }
 
-static gboolean on_button_press(gpointer user_data)
+static gboolean on_button_press(GIOChannel *io, GIOCondition cond, gpointer user_data)
 {
 	int err;
+	char input;
+
+	if (cond & (G_IO_NVAL | G_IO_HUP | G_IO_ERR))
+		return FALSE;
+
+	/* Clear stdin */
+	scanf("%c", &input);
+
 
 	/* The buttons have an external pull-up */
 	/* TODO: Add debouncing */
-	if (!hal_gpio_digital_read(BUTTON)) {
+	//if (!hal_gpio_digital_read(BUTTON)) {
 		if (!pressed) {
 			pressed = TRUE;
 			err = start_adapter();
@@ -316,9 +412,9 @@ static gboolean on_button_press(gpointer user_data)
 
 			g_timeout_add_seconds(TIMEOUT, timed_out, NULL);
 		}
-	} else {
+	//} else {
 		pressed = FALSE;
-	}
+	//}
 
 done:
 	/* Sleep to allow system to handle signals */
@@ -332,6 +428,9 @@ int main(int argc, char *argv[])
 	GError *gerr = NULL;
 	int err, retval = 0;
 	GDBusProxyFlags flags;
+
+	GIOChannel *io = NULL;
+	GIOCondition cond = G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL;
 
 	context = g_option_context_new(NULL);
 	g_option_context_add_main_entries(context, options, NULL);
@@ -391,6 +490,7 @@ int main(int argc, char *argv[])
 		goto done;
 	}
 
+/**********************************************************************
 	if (hal_gpio_setup()) {
 		hal_log_error("IO SETUP ERROR\n");
 		goto done;
@@ -398,6 +498,11 @@ int main(int argc, char *argv[])
 	hal_gpio_pin_mode(LED, OUTPUT);
 	hal_gpio_pin_mode(BUTTON, INPUT);
 	mgmtwatch = g_idle_add(on_button_press, NULL);
+***********************************************************************/
+
+	io = g_io_channel_unix_new(STDIN_FILENO);
+	mgmtwatch = g_io_add_watch(io, cond, on_button_press, proxy_neard);
+	g_io_channel_unref(io);
 
 	/* Attach functions to signals for Interfaces Added and Removed */
 	err = attach_signal();
