@@ -880,6 +880,10 @@ static gboolean read_idle(gpointer user_data)
 {
 	mgmt_read();
 	clients_read();
+
+	/* Sleep to allow system to handle signals */
+	hal_delay_us(100);
+
 	return TRUE;
 }
 
