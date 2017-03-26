@@ -33,6 +33,7 @@ static int opt_channel = -1;
 static int opt_dbm = -255;
 static const char *opt_nodes = "/etc/knot/keys.json";
 static gboolean opt_detach = TRUE;
+static const char *proc_status = "/etc/knot/status";
 
 static void sig_term(int sig)
 {
@@ -86,6 +87,115 @@ static gboolean inotify_cb(GIOChannel *gio, GIOCondition condition,
 	return TRUE;
 }
 
+static int check_status(const char *needs)
+{
+	FILE *fp;
+	int retval = -1;
+	char process[10];
+
+	fp = fopen(proc_status, "r");
+	if (!fp) {
+		log_error("KNoT process status file not found");
+		goto done;
+	}
+
+	while (!eof) {
+		if (!fgets(process, 10, fp)) {
+			log_error("Error reading from KNoT process status file");
+			break;
+		}
+		if (!strcmp(process, needs)) {
+			retval = 0;
+			break;
+		}		
+	}
+
+done:
+	if (fp)
+		fclose(fp);
+	return retval;
+}
+
+static int set_status(const char *process)
+{
+	FILE *fp;
+	int retval = -1;
+
+	fp = fopen(proc_status, "r");
+	if (!fp) {
+		log_error("KNoT process status file not found");
+		goto done;
+	}
+	fp = freopen(proc_status, "a", fp)
+	if (!fp) {
+		log_error("Error opening to append KNoT process status file");
+		goto done;
+	}
+
+	if (fputs(process, fp) == EOF) {
+		log_error("Error appending to KNoT process status file");
+		goto done;
+	}
+	retval = 0;
+
+done:
+	if (fp)
+		fclose(fp);
+	return retval;
+}
+
+static int remove_status(const char *process)
+{
+	FILE *fp;
+	FILE *tmpfile;
+	int retval = -1;
+	char str[10];
+	const char *tmp = "/etc/knot/status.tmp"
+
+	fp = fopen(proc_status, "r");
+	if (!fp) {
+		log_error("KNoT process status file not found");
+		goto done;
+	}
+	tmpfile = fopen(tmp, "w", fp)
+	if (!fp) {
+		log_error("Error opening to write KNoT process status file");
+		goto done;
+	}
+
+	while (!eof) {
+		if (!fgets(str, 10, fp)) {
+			log_error("Error reading from KNoT process status file");
+			break;
+		}
+		if (!strcmp(str, process))
+			continue;
+		
+		if (fputs(str, tmpfile) == EOF) {
+			log_error("Error writing to KNoT process status file");
+			goto done;
+		}
+	}
+	if (remove(proc_status)) {
+		log_error("Couldn't remove old KNoT process status file");
+		goto done;
+	}
+	if (rename(tmp, proc_status)) {
+		log_error("Couldn't update KNoT process status file");
+		goto done;	
+	}
+
+	retval = 0;
+
+done:
+	if (tmpfile)
+		fclose(tmpfile);
+	if (fp)
+		fclose(fp);
+	return retval;
+}
+
+/* TODO: Add single function exit flow */
 int main(int argc, char *argv[])
 {
 	GOptionContext *context;
@@ -124,6 +234,14 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	/* Check if knotd is already up and running */
+	err = check_status("knotd");
+	if (err) {
+		log_error("knotd not up yet");
+		retval = EXIT_FAILURE;
+		goto done;
+	}
+
 	signal(SIGTERM, sig_term);
 	signal(SIGINT, sig_term);
 	signal(SIGPIPE, SIG_IGN);
@@ -146,6 +264,11 @@ int main(int argc, char *argv[])
 		hal_log_close();
 		return EXIT_FAILURE;
 	}
+
+	/* Inserts nrfd on the status file */
+	err = set_status("nrfd");
+	if (err) 
+		goto done;
 
 	/* Set user id to nobody */
 	if (setuid(65534) != 0) {
@@ -193,6 +316,7 @@ done:
 
 	manager_stop();
 
+	remove_status("nrfd");
 	hal_log_error("exiting ...");
 	hal_log_close();
 
