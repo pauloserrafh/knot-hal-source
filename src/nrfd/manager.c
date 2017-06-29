@@ -20,6 +20,7 @@
 #include <json-c/json.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+//#include <stdlib.h>
 
 #include "hal/nrf24.h"
 #include "hal/comm.h"
@@ -144,6 +145,8 @@ static int write_file(const gchar *addr, const gchar *key, const gchar *name)
 		}
 		json_object_object_add(jobj2, "keys", obj_array);
 		json_object_to_file(adapter.file_name, jobj2);
+		hal_log_info("sync keys.json");
+		system("sync");
 		json_object_put(jobj2);
 	} else if (name == NULL) {
 	/* TODO update key of some mac (depends on adding keys to file) */
@@ -155,6 +158,8 @@ static int write_file(const gchar *addr, const gchar *key, const gchar *name)
 						json_object_new_string(addr));
 		json_object_array_add(obj_keys, obj_tmp);
 		json_object_to_file(adapter.file_name, jobj);
+		hal_log_info("sync keys.json");
+		system("sync");
 	}
 
 	err = 0;
