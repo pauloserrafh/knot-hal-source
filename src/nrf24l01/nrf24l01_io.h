@@ -248,8 +248,6 @@ extern "C"{
 #endif
 
 /* IO functions*/
-void delay_us(float us);
-void delay_ms(float ms);
 void enable(void);
 void disable(void);
 int io_setup(const char *dev);

@@ -14,6 +14,7 @@
 #include "spi.h"
 #include "nrf24l01.h"
 #include "nrf24l01_io.h"
+#include "hal/time.h"
 
 
 typedef struct {
@@ -168,7 +169,7 @@ int8_t nrf24l01_init(const char *dev, uint8_t tx_pwr)
 	/* Reset device in power down mode */
 	outr(spi_fd, NRF24_CONFIG, NRF24_CONFIG_RST);
 	/* Delay to establish to operational timing of the nRF24L01 */
-	delay_us(TPD2STBY);
+	hal_delay_us(TPD2STBY);
 
 	/* Reset channel and TX observe registers */
 	outr(spi_fd, NRF24_RF_CH, nrf24reg_read(spi_fd, NRF24_RF_CH) & ~NRF24_RF_CH_MASK);
@@ -191,7 +192,7 @@ int8_t nrf24l01_init(const char *dev, uint8_t tx_pwr)
 	value |= NRF24_CFG_CRCO | NRF24_CFG_PWR_UP;
 	outr(spi_fd, NRF24_CONFIG, value);
 
-	delay_us(TPD2STBY);
+	hal_delay_us(TPD2STBY);
 
 	/* Disable Auto Retransmit Count */
 	outr(spi_fd, NRF24_SETUP_RETR, NRF24_RETR_ARC(NRF24_ARC_DISABLE));
@@ -388,7 +389,7 @@ int8_t nrf24l01_set_ptx(int8_t spi_fd, uint8_t pipe)
 			& ~NRF24_CFG_PRIM_RX);
 	/* Enable and delay time to TSTBY2A timing */
 	enable();
-	delay_us(TSTBY2A);
+	hal_delay_us(TSTBY2A);
 	return 0;
 }
 
@@ -455,7 +456,7 @@ int8_t nrf24l01_set_prx(int8_t spi_fd, uint8_t *pipe0_addr)
 			| NRF24_CFG_PRIM_RX);
 	/* Enable and delay time to TSTBY2A timing */
 	enable();
-	delay_us(TSTBY2A);
+	hal_delay_us(TSTBY2A);
 
 	return 0;
 }

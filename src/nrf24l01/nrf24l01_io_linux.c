@@ -59,16 +59,6 @@
 
 static volatile unsigned	*gpio;
 
-void delay_us(float us)
-{
-	usleep(us);
-}
-
-void delay_ms(float ms)
-{
-	usleep((ms)*1000);
-}
-
 void enable(void)
 {
 	GPIO_SET = (1<<CE);
