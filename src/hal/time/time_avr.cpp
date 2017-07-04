@@ -51,15 +51,14 @@ int hal_getrandom(void *buf, size_t buflen)
 {
 	uint32_t value = (analogRead(A7)+1) * ~hal_time_us();
 	unsigned int rd, i;
-	uint8_t *buf_cpy = (uint8_t *) buf;
 
 	srand((unsigned int)value);
 
 	for (i = 0; i < buflen; i += sizeof(rd)) {
 		rd = rand();
 		(buflen <= i + sizeof(rd))?
-					memcpy(buf_cpy + i, &rd, buflen - i) :
-					memcpy(buf_cpy + i, &rd, sizeof(rd));
+					memcpy(buf + i, &rd, buflen - i) :
+					memcpy(buf + i, &rd, sizeof(rd));
 	}
 
 	return 0;
