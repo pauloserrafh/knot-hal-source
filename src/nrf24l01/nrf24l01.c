@@ -23,6 +23,12 @@ typedef struct {
 	rx_pw;
 } pipe_reg_t;
 
+#ifdef ARDUINO
+static const pipe_reg_t pipe_reg[] = {
+	{ NRF24_AA_P0, NRF24_EN_RXADDR_P0, NRF24_RX_ADDR_P0, NRF24_RX_PW_P0 },
+	{ NRF24_AA_P1, NRF24_EN_RXADDR_P1, NRF24_RX_ADDR_P1, NRF24_RX_PW_P1 }
+};
+#else
 static const pipe_reg_t pipe_reg[] = {
 	{ NRF24_AA_P0, NRF24_EN_RXADDR_P0, NRF24_RX_ADDR_P0, NRF24_RX_PW_P0 },
 	{ NRF24_AA_P1, NRF24_EN_RXADDR_P1, NRF24_RX_ADDR_P1, NRF24_RX_PW_P1 },
@@ -31,6 +37,7 @@ static const pipe_reg_t pipe_reg[] = {
 	{ NRF24_AA_P4, NRF24_EN_RXADDR_P4, NRF24_RX_ADDR_P4, NRF24_RX_PW_P4 },
 	{ NRF24_AA_P5, NRF24_EN_RXADDR_P5, NRF24_RX_ADDR_P5, NRF24_RX_PW_P5 }
 };
+#endif
 
 #define DATA_SIZE	sizeof(uint8_t)
 
