@@ -756,6 +756,7 @@ static int8_t evt_presence(struct mgmt_nrf24_header *mhdr)
 	struct beacon *peer;
 	struct mgmt_evt_nrf24_bcast_presence *evt_pre =
 			(struct mgmt_evt_nrf24_bcast_presence *) mhdr->payload;
+	uint8_t j;
 
 	nrf24_mac2str(&evt_pre->mac, mac_str);
 	peer = g_hash_table_lookup(peer_bcast_table, mac_str);
@@ -859,6 +860,11 @@ done:
 	}
 
 	/* Send Connect */
+	for (i=0; i< 10 ; i++) {
+	hal_comm_connect(peers[position].socket_fd,
+				&evt_pre->mac.address.uint64);
+		for (j=0; j<10000; j++);
+	}
 	return hal_comm_connect(peers[position].socket_fd,
 			&evt_pre->mac.address.uint64);
 }

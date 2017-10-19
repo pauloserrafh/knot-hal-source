@@ -132,6 +132,7 @@ int main(int argc, char *argv[])
 
 	hal_log_init("nrfd", opt_detach);
 	hal_log_info("KNOT HAL nrfd");
+	hal_log_info("hammerhead");
 
 	if (opt_host)
 		hal_log_error("Development mode: %s:%u", opt_host, opt_port);
